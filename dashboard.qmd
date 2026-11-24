@@ -1,0 +1,596 @@
+---
+title: "Dashboard Makroekonomiczny ALK: Polska i Gospodarki Regionu"
+author: "Malwina Rzepka"
+format:
+  dashboard:
+    # Motyw cosmo + barwy i czcionka ALK z pliku alk.scss
+    theme: [cosmo, alk.scss]
+    # Logo ALK w pasku nawigacji (Quarto samo kopiuje je do docs/)
+    logo: assets/alk_logo.png
+    orientation: rows
+    # Stopka ALK na każdej stronie (plik HTML z obrazkiem akredytacji)
+    include-after-body: stopka.html
+    nav-buttons:
+      - icon: github
+        href: https://github.com
+# Pliki dołączane do wyniku "ręcznie" – obrazek ze stopka.html trafi do docs/assets/
+resources:
+  - assets/alk_stopka.png
+---
+
+```{r}
+#| echo: false
+#| message: false
+library(tidyverse)
+library(plotly)
+
+# Wczytanie danych makroekonomicznych
+df <- read_csv("data/macro_data.csv")
+
+# Ostatni dostępny pełny rok dla Polski
+df_pol <- df |>
+  filter(Kraj == "POL") |>
+  drop_na() |>
+  arrange(Rok)
+last_pol <- slice_tail(df_pol, n = 1)
+last_year <- last_pol$Rok
+
+# Ostatni rok, dla którego komplet wskaźników mają wszystkie kraje
+# (najświeższe odczyty w API bywają niepełne dla części państw)
+rok_por <- df |>
+  drop_na() |>
+  count(Rok) |>
+  filter(n == n_distinct(df$Kraj)) |>
+  pull(Rok) |>
+  max()
+
+# Barwy identyfikacji wizualnej ALK (te same co w pliku alk.scss)
+alk_granat <- "#030928"  # granat ALK
+alk_zloto <- "#B4865E"   # złoty / brązowy akcent ALK
+
+# Barwy krajów używane na wykresach porównawczych
+# (Niemcy w turkusie, aby nie zlewały się z granatem Polski)
+kolory_krajow <- c(
+  "Polska" = alk_granat,
+  "Niemcy" = "#0891b2",
+  "Czechy" = alk_zloto,
+  "Stany Zjednoczone" = "#dc2626"
+)
+
+# Wspólne marginesy wykresów
+marginesy <- list(l = 20, r = 20, t = 30, b = 20)
+```
+
+# {.sidebar}
+
+### 🏛️ Akademia Leona Koźmińskiego
+**Laboratorium Analityki Makroekonomicznej**
+
+Niniejszy dashboard został stworzony w ekosystemie **Quarto Dashboard** z wykorzystaniem języka **R** i pakietu **plotly**.
+
+---
+
+### 📌 Badane Wskaźniki
+* **PKB (%):** Roczny realny wzrost gospodarczy.
+* **Inflacja CPI (%):** Indeks cen towarów i usług konsumpcyjnych.
+* **Bezrobocie (%):** Odsetek siły roboczej bez zatrudnienia.
+* **PKB per capita:** PKB na mieszkańca w bieżących USD.
+
+---
+
+### 🌐 Źródło danych
+Dane pochodzą z otwartego API **Banku Światowego (The World Bank Group)**.
+
+**Dane aktualne do roku: `r last_year`**
+
+> **Wskazówka:** Wykresy są w pełni interaktywne – najechanie kursorem ujawnia dokładne wartości, a zaznaczenie obszaru powiększa wybrany fragment.
+
+# 🇵🇱 Polska (Trendy Krajowe)
+
+## Row {height=25%}
+
+```{r}
+#| content: valuebox
+list(
+  title = paste0("Wzrost PKB (", last_year, ")"),
+  icon = "graph-up-arrow",
+  color = "primary",
+  value = sprintf("%.2f%%", last_pol$Wzrost_PKB_proc)
+)
+```
+
+```{r}
+#| content: valuebox
+list(
+  title = paste0("Inflacja CPI (", last_year, ")"),
+  icon = "cash-coin",
+  color = "danger",
+  value = sprintf("%.2f%%", last_pol$Inflacja_CPI_proc)
+)
+```
+
+```{r}
+#| content: valuebox
+list(
+  title = paste0("Stopa Bezrobocia (", last_year, ")"),
+  icon = "people",
+  color = "info",
+  value = sprintf("%.2f%%", last_pol$Bezrobocie_proc)
+)
+```
+
+```{r}
+#| content: valuebox
+list(
+  title = paste0("PKB per capita (", last_year, ")"),
+  icon = "currency-dollar",
+  color = "success",
+  value = paste0("$", format(round(last_pol$PKB_per_capita_USD), big.mark = ","))
+)
+```
+
+## Row {height=45%}
+
+```{r}
+#| title: !expr 'paste0("Wzrost PKB vs Inflacja CPI w Polsce (", min(df_pol$Rok), "–", last_year, ")")'
+plot_ly(df_pol, x = ~Rok) |>
+  add_trace(
+    y = ~Wzrost_PKB_proc, name = "Wzrost PKB (%)",
+    type = "scatter", mode = "lines+markers",
+    line = list(color = alk_granat, width = 3),
+    marker = list(color = alk_granat)
+  ) |>
+  add_trace(
+    y = ~Inflacja_CPI_proc, name = "Inflacja CPI (%)",
+    type = "scatter", mode = "lines+markers",
+    line = list(color = "#dc2626", width = 2.5, dash = "dash"),
+    marker = list(color = "#dc2626")
+  ) |>
+  layout(
+    xaxis = list(title = "Rok"),
+    yaxis = list(title = "Wartość wskaźnika (%)"),
+    hovermode = "x unified",
+    margin = marginesy,
+    legend = list(orientation = "h", yanchor = "bottom", y = 1.02, xanchor = "right", x = 1)
+  )
+```
+
+```{r}
+#| title: "Ewolucja PKB per capita w Polsce (USD)"
+plot_ly(
+  df_pol, x = ~Rok, y = ~PKB_per_capita_USD,
+  type = "scatter", mode = "lines+markers", fill = "tozeroy",
+  line = list(color = alk_zloto),
+  marker = list(color = alk_zloto),
+  # Półprzezroczysty złoty ALK (#B4865E = rgb 180, 134, 94)
+  fillcolor = "rgba(180, 134, 94, 0.35)"
+) |>
+  layout(
+    xaxis = list(title = "Rok"),
+    yaxis = list(title = "USD"),
+    hovermode = "x unified",
+    margin = marginesy
+  )
+```
+
+## Row {.tabset height=30%}
+
+```{r}
+#| title: "📋 Tabela Danych"
+df_pol |>
+  arrange(desc(Rok)) |>
+  select(
+    Rok,
+    `PKB (%)` = Wzrost_PKB_proc,
+    `Inflacja (%)` = Inflacja_CPI_proc,
+    `Bezrobocie (%)` = Bezrobocie_proc,
+    `PKB per capita (USD)` = PKB_per_capita_USD
+  ) |>
+  knitr::kable()
+```
+
+```{r}
+#| title: "📊 Struktura Wskaźników"
+df_pol |>
+  arrange(Rok) |>
+  mutate(
+    tempo_pkb_pc = round((PKB_per_capita_USD / lag(PKB_per_capita_USD) - 1) * 100, 2)
+  ) |>
+  plot_ly(
+    x = ~Rok,
+    y = ~tempo_pkb_pc,
+    type = "bar",
+    marker = list(
+      color = alk_granat,
+      line = list(color = alk_zloto, width = 1)
+    ),
+    hovertemplate = paste0(
+      "<b>Rok:</b> %{x}<br>",
+      "<b>Tempo PKB per capita:</b> %{y:.2f}%<extra></extra>"
+    )
+  ) |>
+  layout(
+    xaxis = list(title = "Rok"),
+    yaxis = list(title = "Roczne tempo<br>wzrostu (%)"),
+    margin = list(l = 50, r = 20, t = 30, b = 20)
+  )
+```
+
+# 🌍 Porównanie Regionalne (PL, DE, CZ, USA)
+
+## Row {height=50%}
+
+```{r}
+#| title: !expr 'paste0("Dynamika PKB: Polska na tle Regionu i USA (2018–", max(df$Rok), ")")'
+df |>
+  filter(Rok >= 2018) |>
+  plot_ly(
+    x = ~Rok, y = ~Wzrost_PKB_proc,
+    color = ~Nazwa_Kraju, colors = kolory_krajow,
+    type = "scatter", mode = "lines+markers"
+  ) |>
+  layout(
+    xaxis = list(title = "Rok"),
+    yaxis = list(title = "Wzrost PKB (%)"),
+    hovermode = "x unified",
+    margin = marginesy
+  )
+```
+
+```{r}
+#| title: !expr 'paste0("Poziom Inflacji CPI w ", rok_por - 2, " vs ", rok_por)'
+df |>
+  filter(Rok %in% c(rok_por - 2, rok_por)) |>
+  plot_ly(
+    x = ~Nazwa_Kraju, y = ~Inflacja_CPI_proc,
+    color = ~factor(Rok), colors = c("#fca5a5", "#dc2626"),
+    type = "bar"
+  ) |>
+  layout(
+    barmode = "group",
+    xaxis = list(title = "Kraj"),
+    yaxis = list(title = "Inflacja CPI (%)"),
+    legend = list(title = list(text = "Rok")),
+    margin = marginesy
+  )
+```
+
+## Row {height=50%}
+
+```{r}
+#| title: !expr 'paste0("Krzywa Phillipsa w Regionie: Relacja Inflacji do Bezrobocia (", rok_por, ")")'
+df |>
+  filter(Rok == rok_por) |>
+  plot_ly(
+    x = ~Bezrobocie_proc, y = ~Inflacja_CPI_proc,
+    color = ~Nazwa_Kraju, colors = kolory_krajow,
+    text = ~Nazwa_Kraju, textposition = "top center",
+    type = "scatter", mode = "markers+text",
+    cliponaxis = FALSE,
+    # Wielkość bąbla proporcjonalna do PKB per capita
+    marker = list(size = ~PKB_per_capita_USD / 1500, opacity = 0.8)
+  ) |>
+  layout(
+    xaxis = list(title = "Stopa bezrobocia (%)"),
+    yaxis = list(title = "Inflacja CPI (%)"),
+    margin = marginesy
+  )
+```
+
+```{r}
+#| title: !expr 'paste0("Profil Makroekonomiczny: Polska vs Niemcy (", rok_por, ")")'
+df_por_radar <- df |>
+  filter(Rok == rok_por) |>
+  mutate(
+    # Znormalizowane wskaźniki (skala 0–1 na tle regionu):
+    # 1. Wzrost PKB (stymulanta)
+    norm_wzrost = (Wzrost_PKB_proc - min(Wzrost_PKB_proc)) / (max(Wzrost_PKB_proc) - min(Wzrost_PKB_proc)),
+    # 2. Odwrotność Inflacji (wyższa wartość = niższa inflacja)
+    odwr_inf = 1 / Inflacja_CPI_proc,
+    norm_inflacja = (odwr_inf - min(odwr_inf)) / (max(odwr_inf) - min(odwr_inf)),
+    # 3. Stabilność Zatrudnienia (100 - bezrobocie)
+    stab_zatr = 100 - Bezrobocie_proc,
+    norm_zatrudnienie = (stab_zatr - min(stab_zatr)) / (max(stab_zatr) - min(stab_zatr))
+  )
+
+pol_dane <- df_por_radar |> filter(Kraj == "POL")
+deu_dane <- df_por_radar |> filter(Kraj == "DEU")
+
+kategorie <- c("Wzrost PKB", "Odwrotność Inflacji", "Stabilność Zatrudnienia")
+
+r_pol <- c(pol_dane$norm_wzrost, pol_dane$norm_inflacja, pol_dane$norm_zatrudnienie)
+r_pol <- c(r_pol, r_pol[1])
+
+r_deu <- c(deu_dane$norm_wzrost, deu_dane$norm_inflacja, deu_dane$norm_zatrudnienie)
+r_deu <- c(r_deu, r_deu[1])
+
+theta_osie <- c(kategorie, kategorie[1])
+
+plot_ly(
+  type = "scatterpolar",
+  fill = "toself",
+  r = r_pol,
+  theta = theta_osie,
+  name = "Polska (POL)",
+  line = list(color = alk_granat, width = 2.5),
+  fillcolor = "rgba(3, 9, 40, 0.35)",
+  marker = list(color = alk_granat, size = 6)
+) |>
+  add_trace(
+    r = r_deu,
+    theta = theta_osie,
+    name = "Niemcy (DEU)",
+    line = list(color = alk_zloto, width = 2.5),
+    fillcolor = "rgba(180, 134, 94, 0.35)",
+    marker = list(color = alk_zloto, size = 6)
+  ) |>
+  layout(
+    polar = list(
+      radialaxis = list(
+        visible = TRUE,
+        range = c(0, 1)
+      )
+    ),
+    margin = marginesy,
+    legend = list(orientation = "h", yanchor = "bottom", y = -0.25, xanchor = "center", x = 0.5)
+  )
+```
+
+::: {.card title="Wnioski"}
+### 🔍 Główne Wnioski z Danych Makroekonomicznych:
+1. **Odporność polskiej gospodarki:** Polska w ostatnich latach wykazuje wyższe tempo wzrostu PKB niż Niemcy, co potwierdza postępującą konwergencję gospodarczą.
+2. **Dezinflacja w regionie:** Szczyt inflacji z lat 2022–2023 został skutecznie stłumiony we wszystkich analizowanych gospodarkach.
+3. **Niska stopa bezrobocia:** Rynek pracy w Polsce i Czechach pozostaje jednym z najbardziej stabilnych w Unii Europejskiej (bezrobocie poniżej 3%).
+:::
+
+# 🎲 Symulacja Monte Carlo (PKB do 2050)
+
+```{r}
+#| include: false
+# ==================== PARAMETRY SYMULACJI ====================
+# Zmień te wartości i wyrenderuj dashboard ponownie:
+n_sim <- 1000        # liczba symulowanych ścieżek PKB
+rok_koncowy <- 2050  # ostatni rok symulacji (horyzont)
+set.seed(2050)       # stałe ziarno losowania = ten sam wynik przy każdym renderowaniu
+# =============================================================
+
+# Pomocnicza funkcja: liczba z polskim przecinkiem dziesiętnym (np. 2,4)
+fmt_pl <- function(x, cyfry = 1) {
+  formatC(x, format = "f", digits = cyfry, decimal.mark = ",", big.mark = " ")
+}
+
+# 1. Parametry rozkładu z historycznych danych (realny wzrost PKB Polski w %)
+mu <- mean(df_pol$Wzrost_PKB_proc)     # średnie roczne tempo wzrostu
+sigma <- sd(df_pol$Wzrost_PKB_proc)    # odchylenie standardowe wzrostu
+
+# Najgłębszy spadek w próbie (do opisu założeń, bez wpisywania roku na sztywno)
+rok_min <- df_pol$Rok[which.min(df_pol$Wzrost_PKB_proc)]
+wzrost_min <- min(df_pol$Wzrost_PKB_proc)
+
+# 2. Lata symulacji: od roku po ostatnich danych do horyzontu
+lata_sym <- (last_year + 1):rok_koncowy
+n_lat <- length(lata_sym)
+
+# 3. Indeks historyczny (last_year = 100) odtworzony wstecz ze stóp wzrostu:
+#    indeks(t-1) = indeks(t) / (1 + g(t)/100)
+indeks_hist <- df_pol |>
+  arrange(desc(Rok)) |>                            # od najnowszego roku wstecz
+  mutate(
+    narastajaco = cumprod(1 + Wzrost_PKB_proc / 100),
+    indeks = 100 / lag(narastajaco, default = 1)   # w last_year dzielimy przez 1
+  ) |>
+  arrange(Rok) |>
+  select(Rok, Wzrost_PKB_proc, indeks)
+
+# 4. Symulacja: każda ścieżka i każdy rok dostaje niezależne losowanie wzrostu
+symulacje <- expand_grid(sciezka = 1:n_sim, Rok = lata_sym) |>
+  mutate(wzrost = rnorm(n(), mean = mu, sd = sigma)) |>
+  group_by(sciezka) |>
+  mutate(indeks = 100 * cumprod(1 + wzrost / 100)) |>   # skumulowany wzrost od 100
+  ungroup()
+
+# Punkt startowy (last_year = 100) dołączony do każdej ścieżki, aby linie łączyły się z historią
+sciezki <- bind_rows(
+  tibble(sciezka = 1:n_sim, Rok = last_year, indeks = 100),
+  select(symulacje, sciezka, Rok, indeks)
+) |>
+  arrange(sciezka, Rok)
+
+# 5. Percentyle w każdym roku: 5%, mediana, 95%
+pasmo <- sciezki |>
+  group_by(Rok) |>
+  summarise(
+    p05 = quantile(indeks, 0.05),
+    mediana = median(indeks),
+    p95 = quantile(indeks, 0.95)
+  )
+wynik_koncowy <- filter(pasmo, Rok == rok_koncowy)
+
+# 6. Ranking ścieżek według indeksu w roku końcowym
+ranking <- symulacje |>
+  filter(Rok == rok_koncowy) |>
+  arrange(desc(indeks))
+
+top3 <- ranking |>
+  slice_head(n = 3) |>
+  mutate(scenariusz = paste("Top", 1:3))
+
+najgorsze3 <- ranking |>
+  slice_tail(n = 3) |>
+  arrange(indeks) |>                      # Najgorsza 1 = najniższy wynik
+  mutate(scenariusz = paste("Najgorsza", 1:3))
+
+# Sześć wyróżnionych scenariuszy + krotność PKB i średnioroczny wzrost (CAGR)
+wyroznione <- bind_rows(top3, najgorsze3) |>
+  mutate(
+    krotnosc = indeks / 100,
+    cagr = (krotnosc^(1 / n_lat) - 1) * 100
+  ) |>
+  select(scenariusz, sciezka, indeks, krotnosc, cagr)
+
+# Barwy i style linii: zielenie dla najlepszych, czerwienie dla najgorszych
+kolory_scenariuszy <- c(
+  "Top 1" = "#14532d", "Top 2" = "#15803d", "Top 3" = "#22c55e",
+  "Najgorsza 1" = "#7f1d1d", "Najgorsza 2" = "#dc2626", "Najgorsza 3" = "#f97316"
+)
+linie_scenariuszy <- c(
+  "Top 1" = "solid", "Top 2" = "dash", "Top 3" = "dot",
+  "Najgorsza 1" = "solid", "Najgorsza 2" = "dash", "Najgorsza 3" = "dot"
+)
+```
+
+## Row {height=20%}
+
+```{r}
+#| content: valuebox
+# Mediana indeksu w roku końcowym i ile razy większy byłby PKB niż dziś
+list(
+  title = paste0("Mediana indeksu ", rok_koncowy),
+  icon = "bullseye",
+  color = "primary",
+  value = paste0(fmt_pl(wynik_koncowy$mediana, 0), " (×", fmt_pl(wynik_koncowy$mediana / 100), ")")
+)
+```
+
+```{r}
+#| content: valuebox
+# Zakres, w którym mieści się 90% symulowanych wyników
+list(
+  title = paste0("Przedział 5–95% ", rok_koncowy),
+  icon = "arrows-expand",
+  color = alk_zloto,
+  value = paste0(fmt_pl(wynik_koncowy$p05, 0), "–", fmt_pl(wynik_koncowy$p95, 0))
+)
+```
+
+```{r}
+#| content: valuebox
+# Parametry rozkładu normalnego oszacowane na danych historycznych
+list(
+  title = "Wzrost PKB: średnia ± odch. std.",
+  icon = "sliders",
+  color = "light",
+  value = paste0(fmt_pl(mu, 2), "% ± ", fmt_pl(sigma, 2))
+)
+```
+
+```{r}
+#| content: valuebox
+# Liczba symulowanych ścieżek
+list(
+  title = "Liczba symulacji",
+  icon = "shuffle",
+  color = "light",
+  value = fmt_pl(n_sim, 0)
+)
+```
+
+## Row {height=42%}
+
+```{r}
+#| title: !expr 'paste0("Indeks realnego PKB Polski (", last_year, " = 100): historia i ", n_sim, " symulacji na lata ", last_year + 1, "–", rok_koncowy)'
+# Wszystkie ścieżki jako JEDEN ślad: group_by() sprawia, że plotly rozdziela
+# ścieżki brakami danych (NA) zamiast tworzyć 1000 osobnych serii
+wykres_mc <- plot_ly() |>
+  add_lines(
+    data = group_by(sciezki, sciezka),
+    x = ~Rok, y = ~indeks,
+    name = paste0("Ścieżki (", n_sim, ")"),
+    line = list(color = "rgba(120, 120, 120, 0.08)", width = 1)
+  ) |>
+  # Pasmo 5–95%: obszar między 5. a 95. percentylem
+  add_ribbons(
+    data = pasmo,
+    x = ~Rok, ymin = ~p05, ymax = ~p95,
+    name = "Pasmo 5–95%",
+    fillcolor = "rgba(180, 134, 94, 0.30)",
+    line = list(color = "rgba(180, 134, 94, 0)"),
+    hoverinfo = "skip"
+  ) |>
+  # Historia: indeks odtworzony ze stóp wzrostu
+  add_lines(
+    data = indeks_hist,
+    x = ~Rok, y = ~indeks,
+    name = "Historia",
+    line = list(color = "#3F3F3F", width = 3),
+    mode = "lines+markers", marker = list(color = "#3F3F3F", size = 5),
+    hovertemplate = "Historia<br>Rok: %{x}<br>Indeks: %{y:.1f}<extra></extra>"
+  ) |>
+  # Mediana wszystkich symulacji w każdym roku
+  add_lines(
+    data = pasmo,
+    x = ~Rok, y = ~mediana,
+    name = "Mediana",
+    line = list(color = alk_granat, width = 3),
+    hovertemplate = "Mediana<br>Rok: %{x}<br>Indeks: %{y:.1f}<extra></extra>"
+  )
+
+# Sześć wyróżnionych ścieżek (Top 1–3 i Najgorsza 1–3) – każda jako osobna seria w legendzie
+for (i in seq_len(nrow(wyroznione))) {
+  nazwa <- wyroznione$scenariusz[i]
+  dane_sciezki <- filter(sciezki, sciezka == wyroznione$sciezka[i])
+  wykres_mc <- wykres_mc |>
+    add_lines(
+      data = dane_sciezki,
+      x = ~Rok, y = ~indeks,
+      name = nazwa,
+      line = list(color = kolory_scenariuszy[[nazwa]], width = 2, dash = linie_scenariuszy[[nazwa]]),
+      hovertemplate = paste0(nazwa, "<br>Rok: %{x}<br>Indeks: %{y:.1f}<extra></extra>")
+    )
+}
+
+# Pionowa linia w roku startu symulacji + podpis
+wykres_mc |>
+  # Chmura ścieżek (ślad nr 1) bez dymków – szybszy i czytelniejszy wykres
+  style(hoverinfo = "skip", traces = 1) |>
+  layout(
+    xaxis = list(title = "Rok"),
+    yaxis = list(title = paste0("Indeks PKB (", last_year, " = 100)")),
+    shapes = list(list(
+      type = "line", x0 = last_year, x1 = last_year,
+      y0 = 0, y1 = 1, yref = "paper",
+      line = list(color = alk_zloto, width = 2, dash = "dash")
+    )),
+    annotations = list(list(
+      x = last_year, y = 1, yref = "paper",
+      text = "start symulacji", showarrow = FALSE,
+      xanchor = "left", yanchor = "top", font = list(color = alk_zloto)
+    )),
+    hovermode = "closest",
+    margin = marginesy,
+    legend = list(font = list(size = 11))
+  )
+```
+
+## Row {height=38%}
+
+```{r}
+#| title: !expr 'paste0("Wyróżnione scenariusze: najlepsze i najgorsze 3 z ", n_sim, " ścieżek")'
+# Tabela sześciu skrajnych ścieżek z polskim formatowaniem liczb
+wyroznione |>
+  transmute(
+    scenariusz,
+    indeks = fmt_pl(indeks, 1),
+    krotnosc = paste0("×", fmt_pl(krotnosc, 2)),
+    cagr = fmt_pl(cagr, 2)
+  ) |>
+  knitr::kable(
+    col.names = c(
+      "Scenariusz",
+      paste0("Indeks ", rok_koncowy),
+      paste0("PKB ", rok_koncowy, " / ", last_year),
+      "Średni wzrost (CAGR, %)"
+    ),
+    align = "lrrr"
+  )
+```
+
+::: {.card .alk-tekst-karty title="Założenia i ograniczenia"}
+- **Model:** roczny wzrost realnego PKB losujemy niezależnie z rozkładu normalnego dopasowanego do danych z lat `r min(df_pol$Rok)`–`r last_year` (`r nrow(df_pol)` obserwacji): średnia `r fmt_pl(mu, 2)`%, odchylenie standardowe `r fmt_pl(sigma, 2)` p.p.
+- **Stałe parametry:** zakładamy tę samą średnią i wariancję wzrostu aż do `r rok_koncowy` roku – bez demografii, starzenia się społeczeństwa ani zmian strukturalnych gospodarki.
+- **Krótka próba:** tylko `r nrow(df_pol)` lat, w tym szok z `r rok_min` roku (wzrost `r fmt_pl(wzrost_min, 2)`%), który mocno podbija odchylenie standardowe.
+- **Top 3 i najgorsze 3** to skrajne losowania spośród `r n_sim` ścieżek, a nie prognozy czy scenariusze ekonomiczne.
+- **Indeks, nie poziom PKB:** dane zawierają tempo wzrostu, więc pokazujemy indeks (`r last_year` = 100), a nie PKB w złotych czy dolarach.
+
+*To ilustracja dydaktyczna metody Monte Carlo, a nie prognoza gospodarcza.*
+:::

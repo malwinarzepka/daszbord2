@@ -1,0 +1,112 @@
+/*-- scss:defaults --*/
+
+// Kolory identyfikacji wizualnej ALK (odczytane z papieru firmowego)
+$alk-granat: #030928;   // główny granat (logo, nagłówki)
+$alk-zloto:  #B4865E;   // akcent złoty / brązowy
+$alk-tekst:  #3F3F3F;   // szary kolor tekstu
+
+// Czcionka Open Sans z Google Fonts (zastępuje domyślną czcionkę motywu cosmo)
+$web-font-path: "https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap";
+$font-family-sans-serif: "Open Sans", -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+
+// Kolory motywu: "primary" = granat ALK (np. kafelki KPI z color = "primary")
+$primary: $alk-granat;
+$secondary: $alk-zloto;
+$body-color: $alk-tekst;
+$link-color: $alk-granat;
+
+// Jasny pasek nawigacji – granatowe logo i napisy są na nim dobrze widoczne
+$navbar-bg: #ffffff;
+$navbar-fg: $alk-granat;
+$navbar-hl: $alk-zloto;
+
+/*-- scss:rules --*/
+
+// Złota linia pod paskiem nawigacji
+#quarto-dashboard-header .navbar {
+  border-bottom: 3px solid $alk-zloto;
+}
+
+// Granatowy, nieco mniejszy tytuł dashboardu (długi tytuł mieści się w pasku)
+#quarto-dashboard-header .navbar-title-text {
+  font-size: 1.15rem;
+}
+#quarto-dashboard-header .navbar-title-text a {
+  color: $alk-granat;
+  font-weight: 700;
+}
+
+// Zakładki stron: mniejsza czcionka i złote tło aktywnej strony
+#quarto-dashboard-header .nav-link {
+  font-size: 0.95rem;
+}
+// Na szerokim ekranie nazwy stron w jednej linii (na wąskim mogą się zawijać)
+@media (min-width: 1200px) {
+  #quarto-dashboard-header .nav-link {
+    white-space: nowrap;
+  }
+}
+// Na węższym ekranie: mniejszy tytuł, bez linii autora – więcej miejsca na wykresy
+@media (max-width: 1199.98px) {
+  #quarto-dashboard-header .navbar-title-text {
+    font-size: 0.95rem;
+  }
+  #quarto-dashboard-header .navbar-author {
+    display: none;
+  }
+  #quarto-dashboard-header .nav-link {
+    font-size: 0.85rem;
+  }
+  // ikony w kafelkach KPI chowamy, aby zmieściły się liczby
+  .quarto-dashboard .bslib-value-box .value-box-showcase {
+    display: none;
+  }
+}
+#quarto-dashboard-header .nav-link.active {
+  color: $alk-granat;
+  background-color: rgba($alk-zloto, 0.15);
+}
+
+// Kafelki KPI z color = "primary" w granacie ALK
+// (motyw cosmo ma dla kafelków własny jasnoniebieski kolor, więc nadpisujemy go wprost)
+.quarto-dashboard .card.valuebox.bslib-card.bg-primary {
+  background-color: $alk-granat !important;
+  color: #ffffff;
+}
+
+// Tytuły kart w kolorze granatowym
+.card-header {
+  color: $alk-granat;
+  font-weight: 600;
+}
+
+// Mniejsza czcionka w karcie z dłuższym tekstem (klasa .alk-tekst-karty w dashboard.qmd)
+.alk-tekst-karty {
+  font-size: 0.9rem;
+}
+
+// Stopka z paskiem akredytacji (wstawiana z pliku stopka.html)
+.alk-stopka {
+  flex: 0 0 auto !important;   // stała wysokość: stopka się nie ściska i nie zasłania kart
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem 1.5rem;
+  padding: 0.35rem 1rem;
+  background: #ffffff;
+  border-top: 1px solid rgba($alk-granat, 0.15);
+  font-size: 0.75rem;
+  color: $alk-tekst;
+}
+.alk-stopka img {
+  height: 22px;
+  width: auto;
+  max-width: 100%;             // na wąskim ekranie obrazek się zmniejsza
+  object-fit: contain;
+}
+
+.quarto-dashboard .bslib-value-box .value-box-value {
+  font-size: 1.8rem !important;
+  white-space: nowrap;
+}
